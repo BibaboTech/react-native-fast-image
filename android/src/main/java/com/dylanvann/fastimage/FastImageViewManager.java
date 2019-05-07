@@ -108,6 +108,11 @@ class FastImageViewManager extends SimpleViewManager<FastImageViewWithUrl> imple
                     .into(view);
         }
     }
+    
+    @ReactProp(name = "filters")
+    public void setFilters(FastImageViewWithUrl view, @Nullable String filters) {
+        view.setFilters(filters);
+    }
 
     @ReactProp(name = "tintColor", customType = "Color")
     public void setTintColor(FastImageViewWithUrl view, @Nullable Integer color) {
