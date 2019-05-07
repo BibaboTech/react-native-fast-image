@@ -12,6 +12,10 @@ import com.bumptech.glide.load.model.GlideUrl;
 
 import com.zomato.photofilters.FilterPack;
 import com.zomato.photofilters.imageprocessors.Filter;
+import com.zomato.photofilters.imageprocessors.subfilters.BrightnessSubFilter;
+import com.zomato.photofilters.imageprocessors.subfilters.ColorOverlaySubFilter;
+import com.zomato.photofilters.imageprocessors.subfilters.ContrastSubFilter;
+import com.zomato.photofilters.imageprocessors.subfilters.SaturationSubfilter;
 
 import java.util.Hashtable;
 
@@ -78,15 +82,58 @@ class FastImageViewWithUrl extends ImageView {
             this.ensureFilters(this.getContext());
             String[] filtersMap = mRequestedFilters.split(",");
             for (String flt : filtersMap) {
-                String[] fltInfo = flt.split(":");
-                Filter filter = sFilters.get(fltInfo[0]);
+                Filter filter = this.findFilter(flt);
                 if (filter != null) {
                     target = filter.processFilter(target);
                 }
+
             }
             Drawable d = new BitmapDrawable(getResources(), target);
             super.setImageDrawable(d);
         }
+    }
+
+    private Filter findFilter(String filter) {
+        String[] fltInfo = filter.split(":");
+        Filter filterObject = sFilters.get(fltInfo[0]);
+        if (filterObject != null) {
+            return filterObject;
+        }
+
+        if (fltInfo.length < 2) {
+            return null;
+        }
+
+        int value = Integer.parseInt(fltInfo[1]);
+        if (value >= 0) {
+            if (fltInfo[0].equals("bright")) {
+                filterObject = new Filter();
+                filterObject.addSubFilter(new BrightnessSubFilter(value));
+                return filterObject;
+
+            } else if (fltInfo[0].equals("contrast")) {
+                float contrast = ((float)value) / 10;
+                filterObject = new Filter();
+                filterObject.addSubFilter(new ContrastSubFilter(contrast));
+                return filterObject;
+
+            } else if (fltInfo[0].equals("warmth")) {
+                float red = (((float) value) / 100);
+                float green = 0;
+                float blue = 0;
+                filterObject = new Filter();
+                filterObject.addSubFilter(new ColorOverlaySubFilter(100, red, green, blue));
+                return filterObject;
+
+            } else if (fltInfo[0].equals("saturation")) {
+                float saturation = ((float)value) / 10;
+                filterObject = new Filter();
+                filterObject.addSubFilter(new SaturationSubfilter(saturation));
+                return filterObject;
+            }
+        }
+
+        return null;
     }
 
     private static Hashtable<String, Filter> sFilters = null;
