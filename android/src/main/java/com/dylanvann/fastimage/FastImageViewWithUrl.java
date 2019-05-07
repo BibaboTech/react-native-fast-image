@@ -74,7 +74,8 @@ class FastImageViewWithUrl extends ImageView {
         if (!url.equals(loadUrl)) {
             loadUrl = url;
             url = url.substring(7);
-            originalImage = BitmapFactory.decodeFile(url, new BitmapFactory.Options());
+            //originalImage = BitmapFactory.decodeFile(url, new BitmapFactory.Options());
+            originalImage = FastImageViewWithUrl.getSafeResizingBitmap(url);
         }
 
         if (originalImage != null) {
@@ -157,5 +158,43 @@ class FastImageViewWithUrl extends ImageView {
             sFilters.put("Metropolis", FilterPack.getMetropolis(context));
             sFilters.put("Audrey", FilterPack.getAudreyFilter(context));
         }
+    }
+
+    public static Bitmap getSafeResizingBitmap(String strImagePath) {
+
+        BitmapFactory.Options options = getBitmapSize(strImagePath);
+
+        if (options == null) {
+            return null;
+        }
+
+        int widthSample = 1;
+        int heightSample = 1;
+        if (options.outWidth > 2048) {
+            widthSample = options.outWidth / 1024;
+        }
+        if (options.outHeight > 2048) {
+            heightSample = options.outHeight / 1024;
+        }
+        if (widthSample > 1 && heightSample > 1) {
+            options.inSampleSize = (widthSample < heightSample)?widthSample:heightSample;
+        }
+
+        options.inJustDecodeBounds = false;
+        options.inDither = false;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        options.inPurgeable = true;
+
+        Bitmap photo = BitmapFactory.decodeFile(strImagePath, options);
+
+        return photo;
+    }
+
+    public static BitmapFactory.Options getBitmapSize(String strImagePath) {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(strImagePath, options);
+
+        return options;
     }
 }
