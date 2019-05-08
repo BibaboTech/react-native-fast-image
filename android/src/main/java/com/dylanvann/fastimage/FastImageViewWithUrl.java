@@ -74,7 +74,6 @@ class FastImageViewWithUrl extends ImageView {
         if (!url.equals(loadUrl)) {
             loadUrl = url;
             url = url.substring(7);
-            //originalImage = BitmapFactory.decodeFile(url, new BitmapFactory.Options());
             originalImage = FastImageViewWithUrl.getSafeResizingBitmap(url);
         }
 
@@ -85,7 +84,7 @@ class FastImageViewWithUrl extends ImageView {
             for (String flt : filtersMap) {
                 Filter filter = this.findFilter(flt);
                 if (filter != null) {
-                    target = filter.processFilter(target);
+                    filter.processFilter(target);
                 }
 
             }
@@ -170,11 +169,11 @@ class FastImageViewWithUrl extends ImageView {
 
         int widthSample = 1;
         int heightSample = 1;
-        if (options.outWidth > 2048) {
-            widthSample = options.outWidth / 1024;
+        if (options.outWidth > 700) {
+            widthSample = options.outWidth / 700;
         }
-        if (options.outHeight > 2048) {
-            heightSample = options.outHeight / 1024;
+        if (options.outHeight > 700) {
+            heightSample = options.outHeight / 700;
         }
         if (widthSample > 1 && heightSample > 1) {
             options.inSampleSize = (widthSample < heightSample)?widthSample:heightSample;
@@ -185,9 +184,7 @@ class FastImageViewWithUrl extends ImageView {
         options.inPreferredConfig = Bitmap.Config.ARGB_8888;
         options.inPurgeable = true;
 
-        Bitmap photo = BitmapFactory.decodeFile(strImagePath, options);
-
-        return photo;
+        return BitmapFactory.decodeFile(strImagePath, options);
     }
 
     public static BitmapFactory.Options getBitmapSize(String strImagePath) {
