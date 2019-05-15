@@ -6,16 +6,17 @@ import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
+import android.util.Log;
 import android.widget.ImageView;
 
 import com.bumptech.glide.load.model.GlideUrl;
 
-import com.zomato.photofilters.FilterPack;
-import com.zomato.photofilters.imageprocessors.Filter;
-import com.zomato.photofilters.imageprocessors.subfilters.BrightnessSubFilter;
-import com.zomato.photofilters.imageprocessors.subfilters.ColorOverlaySubFilter;
-import com.zomato.photofilters.imageprocessors.subfilters.ContrastSubFilter;
-import com.zomato.photofilters.imageprocessors.subfilters.SaturationSubfilter;
+import vn.bibabo.so5.imageprocessors.BFilter;
+import vn.bibabo.so5.imageprocessors.BBrightnessSubFilter;
+import vn.bibabo.so5.imageprocessors.BColorOverlaySubFilter;
+import vn.bibabo.so5.imageprocessors.BContrastSubFilter;
+import vn.bibabo.so5.imageprocessors.BSaturationSubFilter;
+import vn.bibabo.so5.imageprocessors.BFilterPack;
 
 import java.util.Hashtable;
 
@@ -38,6 +39,18 @@ class FastImageViewWithUrl extends ImageView {
     @Override
     public void setImageDrawable(Drawable drawable) {
         super.setImageDrawable(drawable);
+        String url = this.glideUrl.toStringUrl();
+        if (url == null || !url.startsWith("file://")) {
+            return;
+        }
+        if (!url.equals(loadUrl)) {
+            loadUrl = url;
+            url = url.substring(7);
+            originalImage = FastImageViewWithUrl.getSafeResizingBitmap(url);
+            int width = originalImage.getWidth();
+            int height = originalImage.getHeight();
+            pixelBuffer = new int[width * height];
+        }
         this.applyFilters();
     }
 
@@ -56,10 +69,13 @@ class FastImageViewWithUrl extends ImageView {
         this.applyFilters();
     }
 
+    protected int[]  pixelBuffer = null;
     protected Bitmap originalImage = null;
     protected String loadUrl = "";
 
     private void applyFilters() {
+        long beforeUsedMem = Runtime.getRuntime().totalMemory()-Runtime.getRuntime().freeMemory();
+
         if (mRequestedFilters == null || mRequestedFilters.length() == 0) {
             if (originalImage != null) {
                 super.setImageDrawable(new BitmapDrawable(getResources(), originalImage));
@@ -75,27 +91,41 @@ class FastImageViewWithUrl extends ImageView {
             loadUrl = url;
             url = url.substring(7);
             originalImage = FastImageViewWithUrl.getSafeResizingBitmap(url);
+            int width = originalImage.getWidth();
+            int height = originalImage.getHeight();
+            pixelBuffer = new int[width * height];
         }
 
         if (originalImage != null) {
-            Bitmap target = originalImage.copy(originalImage.getConfig(), true);
+            int width = originalImage.getWidth();
+            int height = originalImage.getHeight();
+            originalImage.getPixels(pixelBuffer, 0, width, 0, 0, width, height);
+
             this.ensureFilters(this.getContext());
             String[] filtersMap = mRequestedFilters.split(",");
             for (String flt : filtersMap) {
-                Filter filter = this.findFilter(flt);
+                BFilter filter = this.findFilter(flt);
                 if (filter != null) {
-                    filter.processFilter(target);
+                    filter.processFilter(pixelBuffer, width, height);
                 }
-
             }
-            Drawable d = new BitmapDrawable(getResources(), target);
+
+            Bitmap bmm = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            bmm.setPixels(pixelBuffer, 0, width, 0, 0, width, height);
+            Drawable d = new BitmapDrawable(getResources(), bmm);
             super.setImageDrawable(d);
+
+            long afterUsedMem = Runtime.getRuntime().totalMemory()-Runtime.getRuntime().freeMemory();
+            long diff = afterUsedMem - beforeUsedMem;
+            //Log.e("ImageProcessor", "before: " + Math.round(beforeUsedMem / 1024) + " KB"
+            //        + " after: " + Math.round(afterUsedMem / 1024) + " KB"
+            //        + " used: " + Math.round(diff / 2014) + " KB");
         }
     }
 
-    private Filter findFilter(String filter) {
+    private BFilter findFilter(String filter) {
         String[] fltInfo = filter.split(":");
-        Filter filterObject = sFilters.get(fltInfo[0]);
+        BFilter filterObject = sFilters.get(fltInfo[0]);
         if (filterObject != null) {
             return filterObject;
         }
@@ -107,28 +137,28 @@ class FastImageViewWithUrl extends ImageView {
         int value = Integer.parseInt(fltInfo[1]);
         if (value >= 0) {
             if (fltInfo[0].equals("bright")) {
-                filterObject = new Filter();
-                filterObject.addSubFilter(new BrightnessSubFilter(value));
+                filterObject = new BFilter();
+                filterObject.addBSubFilter(new BBrightnessSubFilter(value));
                 return filterObject;
 
             } else if (fltInfo[0].equals("contrast")) {
                 float contrast = ((float)value) / 10;
-                filterObject = new Filter();
-                filterObject.addSubFilter(new ContrastSubFilter(contrast));
+                filterObject = new BFilter();
+                filterObject.addBSubFilter(new BContrastSubFilter(contrast));
                 return filterObject;
 
             } else if (fltInfo[0].equals("warmth")) {
                 float red = (((float) value) / 100);
                 float green = 0;
                 float blue = 0;
-                filterObject = new Filter();
-                filterObject.addSubFilter(new ColorOverlaySubFilter(100, red, green, blue));
+                filterObject = new BFilter();
+                filterObject.addBSubFilter(new BColorOverlaySubFilter(100, red, green, blue));
                 return filterObject;
 
             } else if (fltInfo[0].equals("saturation")) {
                 float saturation = ((float)value) / 10;
-                filterObject = new Filter();
-                filterObject.addSubFilter(new SaturationSubfilter(saturation));
+                filterObject = new BFilter();
+                filterObject.addBSubFilter(new BSaturationSubFilter(saturation));
                 return filterObject;
             }
         }
@@ -136,26 +166,26 @@ class FastImageViewWithUrl extends ImageView {
         return null;
     }
 
-    private static Hashtable<String, Filter> sFilters = null;
+    private static Hashtable<String, BFilter> sFilters = null;
     private void ensureFilters(final Context context) {
         if (sFilters == null) {
             sFilters = new Hashtable<>();
-            sFilters.put("Struck", FilterPack.getAweStruckVibeFilter(context));
-            sFilters.put("Clarendon", FilterPack.getClarendon(context));
-            sFilters.put("OldMan", FilterPack.getOldManFilter(context));
-            sFilters.put("Mars", FilterPack.getMarsFilter(context));
-            sFilters.put("Rise", FilterPack.getRiseFilter(context));
-            sFilters.put("April", FilterPack.getAprilFilter(context));
-            sFilters.put("Amazon", FilterPack.getAmazonFilter(context));
-            sFilters.put("Starlit", FilterPack.getStarLitFilter(context));
-            sFilters.put("Whisper", FilterPack.getNightWhisperFilter(context));
-            sFilters.put("Lime", FilterPack.getLimeStutterFilter(context));
-            sFilters.put("Haan", FilterPack.getHaanFilter(context));
-            sFilters.put("Bluemess", FilterPack.getBlueMessFilter(context));
-            sFilters.put("Adele", FilterPack.getAdeleFilter(context));
-            sFilters.put("Cruz", FilterPack.getCruzFilter(context));
-            sFilters.put("Metropolis", FilterPack.getMetropolis(context));
-            sFilters.put("Audrey", FilterPack.getAudreyFilter(context));
+            sFilters.put("Struck", BFilterPack.getAweStruckVibeFilter(context));
+            sFilters.put("Clarendon", BFilterPack.getClarendon(context));
+            sFilters.put("OldMan", BFilterPack.getOldManFilter(context));
+            sFilters.put("Mars", BFilterPack.getMarsFilter(context));
+            sFilters.put("Rise", BFilterPack.getRiseFilter(context));
+            sFilters.put("April", BFilterPack.getAprilFilter(context));
+            sFilters.put("Amazon", BFilterPack.getAmazonFilter(context));
+            sFilters.put("Starlit", BFilterPack.getStarLitFilter(context));
+            sFilters.put("Whisper", BFilterPack.getNightWhisperFilter(context));
+            sFilters.put("Lime", BFilterPack.getLimeStutterFilter(context));
+            sFilters.put("Haan", BFilterPack.getHaanFilter(context));
+            sFilters.put("Bluemess", BFilterPack.getBlueMessFilter(context));
+            sFilters.put("Adele", BFilterPack.getAdeleFilter(context));
+            sFilters.put("Cruz", BFilterPack.getCruzFilter(context));
+            sFilters.put("Metropolis", BFilterPack.getMetropolis(context));
+            sFilters.put("Audrey", BFilterPack.getAudreyFilter(context));
         }
     }
 
