@@ -39,18 +39,6 @@ class FastImageViewWithUrl extends ImageView {
     @Override
     public void setImageDrawable(Drawable drawable) {
         super.setImageDrawable(drawable);
-        String url = this.glideUrl.toStringUrl();
-        if (url == null || !url.startsWith("file://")) {
-            return;
-        }
-        if (!url.equals(loadUrl)) {
-            loadUrl = url;
-            url = url.substring(7);
-            originalImage = FastImageViewWithUrl.getSafeResizingBitmap(url);
-            int width = originalImage.getWidth();
-            int height = originalImage.getHeight();
-            pixelBuffer = new int[width * height];
-        }
         this.applyFilters();
     }
 
